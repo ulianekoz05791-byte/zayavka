@@ -329,7 +329,7 @@ function updateRow(el, it) {
 /* ---------- ЗАЯВКА ---------- */
 function orderLines(i) {
   if (isList(i)) return [`${i.name}:`, ...flv(i).map(x => `  – ${x.name} — ${fmt(x.qty)} ${i.unit}`)];
-  return [`${i.name} — ${fmt(qty(i))} ${i.unit}`];
+  return [`${i.name} (ост. ${fmt(S.stocks[i.id])} ${i.unit}) — ${fmt(qty(i))} ${i.unit}`];
 }
 function orderText() {
   const d = new Date().toLocaleDateString('ru-RU');
