@@ -42,7 +42,7 @@ button{cursor:pointer}
 .wrap{max-width:720px;margin:0 auto;padding:0 14px 110px}
 
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:12px 0 10px}
-.titlerow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.titlerow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
 h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
 .date{color:var(--muted);font-size:14px}
 .mode{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:4px}
@@ -81,7 +81,7 @@ h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
 .fadd input:focus{background:var(--surface);border-color:var(--acc)}
 .known{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .known .chip{padding:5px 10px;font-size:13px}
-.irow .manual{grid-column:span 2;font-size:12px;color:var(--muted);text-align:center;line-height:1.2}
+.irow .manual{font-size:12px;color:var(--muted);text-align:center;line-height:1.2}
 .field textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--soft);resize:vertical}
 .check.big{margin:0 0 12px;font-size:15px}
 .row .meta{font-size:13px;color:var(--muted);margin-top:2px}
@@ -109,12 +109,12 @@ textarea.out{width:100%;min-height:280px;border:1px solid var(--line);border-rad
 .check{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:10px}
 .empty{text-align:center;color:var(--muted);padding:30px 10px}
 
-.irow{display:grid;grid-template-columns:1fr 58px 58px 58px;gap:8px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
+.irow{display:grid;grid-template-columns:1fr 70px 70px;gap:8px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
 .irow:first-child{border-top:0}
 .irow .nm{background:none;border:0;padding:0;text-align:left;font-weight:500;line-height:1.25}
 .irow .nm small{display:block;color:var(--muted);font-weight:400;font-size:13px}
 .irow input{width:100%;text-align:right;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--soft);font-variant-numeric:tabular-nums}
-.ihead{display:grid;grid-template-columns:1fr 58px 58px 58px;gap:8px;font-size:11px;line-height:1.2;color:var(--muted);padding:0 12px 4px;text-align:right}
+.ihead{display:grid;grid-template-columns:1fr 70px 70px;gap:8px;font-size:11px;line-height:1.2;color:var(--muted);padding:0 12px 4px;text-align:right}
 .ihead span:first-child{text-align:left}
 .cathead .edit{font-size:13px;font-weight:500;color:var(--acc);border:0;background:none;padding:4px 0}
 
@@ -146,14 +146,10 @@ dialog::backdrop{background:rgba(10,20,18,.5)}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
 </head>
-<body data-mode="w">
+<body>
 <div class="wrap">
   <header class="top">
     <div class="titlerow"><h1 id="ttl">Пересчёт</h1><span class="date" id="today"></span></div>
-    <div class="mode" role="group" aria-label="Период заявки">
-      <button data-m="w" aria-pressed="true">Будни</button>
-      <button data-m="e" aria-pressed="false">Выходные</button>
-    </div>
     <div id="subhead"></div>
   </header>
   <main id="main"></main>
@@ -197,6 +193,22 @@ function load() {
     S.items.forEach(i => { if (/^(сироп|топпинг) в ассортименте$/i.test(i.name.trim()) && !i.kind) { i.kind = 'list'; if (!i.step && i.unit === 'л') i.step = 1; } });
     S.mig1 = 1;
   }
+  if (!S.mig2) {
+    S.items.forEach(i => { if (!i.pw && i.pe) i.pw = i.pe; });
+    const tc = S.cats.find(c => c.name.trim().toLowerCase() === 'чай');
+    if (tc && !S.items.some(i => i.cat === tc.id && i.kind === 'list')) {
+      const keep = n => /кофе|имбирь/i.test(n);
+      const teas = S.items.filter(i => i.cat === tc.id && !keep(i.name));
+      const ids = new Set(teas.map(i => i.id));
+      const first = S.items.findIndex(i => i.cat === tc.id);
+      const unit = (teas[0] && teas[0].unit) || 'кг';
+      const tea = { id: uid(), name: 'Чай в ассортименте', unit, cat: tc.id, pw: 0, pe: 0, step: 0.5, kind: 'list', known: teas.map(i => i.name) };
+      S.items = S.items.filter(i => !ids.has(i.id));
+      ids.forEach(id => delete S.stocks[id]);
+      S.items.splice(Math.max(0, Math.min(first, S.items.length)), 0, tea);
+    }
+    S.mig2 = 1;
+  }
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
@@ -209,7 +221,7 @@ function num(v) {
   const n = parseFloat(s);
   return isNaN(n) || n < 0 ? null : n;
 }
-const plan = (it, m = S.mode) => (m === 'w' ? it.pw : it.pe) || 0;
+const plan = it => it.pw || 0;
 const stepOf = it => it.step > 0 ? it.step : ((it.unit === 'шт' || it.kind === 'list') ? 1 : 0.1);
 const isList = it => it.kind === 'list';
 const flv = it => S.lists[it.id] || [];
@@ -224,7 +236,6 @@ function qty(it) {
   return Math.max(step, roundUp(p - st, step));
 }
 const catName = id => (S.cats.find(c => c.id === id) || {}).name || 'Без категории';
-const modeWord = (m = S.mode) => m === 'w' ? 'будни' : 'выходные';
 const dstr = t => new Date(t).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
@@ -250,12 +261,12 @@ function rowHTML(it) {
     const known = (it.known || []).filter(k => !have.has(k.toLowerCase()));
     return `<div class="row list ${f.length ? 'need' : ''}" data-id="${it.id}">
       <div class="nm">${esc(it.name)}</div>
-      <div class="meta">Впишите вкусы, которые нужно заказать. Каждый по ${fmt(stepOf(it))} ${esc(it.unit)}, количество можно менять.</div>
+      <div class="meta">Добавьте нужные вкусы или сорта. Каждый по ${fmt(stepOf(it))} ${esc(it.unit)}, количество можно менять.</div>
       <div class="flv">
         ${f.map((x, k) => `<div class="fl"><span>${esc(x.name)}</span><div class="stp">
           <button data-fdec="${k}" aria-label="Меньше">−</button><b>${fmt(x.qty)} ${esc(it.unit)}</b><button data-finc="${k}" aria-label="Больше">+</button><button class="x" data-fdel="${k}" aria-label="Убрать ${esc(x.name)}">×</button>
         </div></div>`).join('')}
-        <div class="fadd"><input class="fin" placeholder="Вкус, например карамель" enterkeyhint="done" aria-label="Новый вкус"><button class="btn small" data-fadd="1">Добавить</button></div>
+        <div class="fadd"><input class="fin" placeholder="Вписать вкус или сорт" enterkeyhint="done" aria-label="Новый вкус"><button class="btn small" data-fadd="1">Добавить</button></div>
         ${known.length ? `<div class="known">${known.map(k => `<button class="chip" data-fk="${esc(k)}">+ ${esc(k)}</button>`).join('')}</div>` : ''}
       </div>
     </div>`;
@@ -322,7 +333,7 @@ function orderLines(i) {
 }
 function orderText() {
   const d = new Date().toLocaleDateString('ru-RU');
-  let lines = [`Заявка на ${modeWord()}, ${d}`];
+  let lines = [`Заявка, ${d}`];
   let any = false;
   if (S.withCats) {
     S.cats.forEach(c => {
@@ -345,12 +356,12 @@ function renderOrder() {
   const txt = orderText();
   document.getElementById('main').innerHTML = `
     <div class="panel">
-      <h2>Коэффициент на ${modeWord()}</h2>
+      <h2>Коэффициент</h2>
       <p>Умножает все минимальные остатки только для этой заявки: праздник, банкет, трансляция.</p>
       <div class="coefs">${[1, 1.25, 1.5, 2].map(k => `<button class="chip" data-coef="${k}" aria-pressed="${S.coef === k}">×${fmt(k)}</button>`).join('')}</div>
     </div>
     ${unfilled ? `<div class="note">Не заполнен остаток у ${unfilled} позиций с мин. остатком — они не попали в заявку. <button data-show="empty">Показать</button></div>` : ''}
-    ${noPlan ? `<div class="note" style="background:var(--soft)">У ${noPlan} позиций не задан мин. остаток на ${modeWord()}, они не заказываются. <button data-go="items">Задать</button></div>` : ''}
+    ${noPlan ? `<div class="note" style="background:var(--soft)">У ${noPlan} позиций не задан мин. остаток, они не заказываются. <button data-go="items">Задать</button></div>` : ''}
     <div class="panel">
       <h2>${n ? `В заявке ${n} поз.` : 'Заявка пустая'}</h2>
       ${txt ? `<textarea class="out" id="out" readonly>${esc(txt)}</textarea>
@@ -371,12 +382,11 @@ function renderItems() {
     if (q && !items.length) return;
     html += `<section class="cat">
       <div class="cathead"><span>${esc(c.name)}</span><button class="edit" data-editcat="${c.id}">Изменить</button></div>
-      ${items.length ? `<div class="ihead"><span></span><span>Мин. будни</span><span>Мин. вых.</span><span>Заказ по</span></div>
+      ${items.length ? `<div class="ihead"><span></span><span>Мин. остаток</span><span>Заказ по</span></div>
       <div class="rows">${items.map(it => `
         <div class="irow" data-id="${it.id}">
           <button class="nm" data-edit="${it.id}">${esc(it.name)}<small>${esc(it.unit)}</small></button>
-          ${isList(it) ? `<span class="manual">вкусы вписываются вручную</span>` : `<input inputmode="decimal" data-p="pw" aria-label="Минимальный остаток на будни" value="${it.pw ? fmt(it.pw) : ''}" placeholder="—">
-          <input inputmode="decimal" data-p="pe" aria-label="Минимальный остаток на выходные" value="${it.pe ? fmt(it.pe) : ''}" placeholder="—">`}
+          ${isList(it) ? `<span class="manual">вручную</span>` : `<input inputmode="decimal" data-p="pw" aria-label="Минимальный остаток" value="${it.pw ? fmt(it.pw) : ''}" placeholder="—">`}
           <input inputmode="decimal" data-p="step" aria-label="Объём заказа" value="${it.step ? fmt(it.step) : ''}" placeholder="${(it.unit === 'шт' || isList(it)) ? '1' : '—'}">
         </div>`).join('')}</div>` : `<div class="rows"><div class="empty" style="padding:14px">Пусто</div></div>`}
     </section>`;
@@ -395,9 +405,8 @@ function openItem(id) {
     <div class="grid2">
       <label class="field"><span>Ед. измерения</span><input id="f_unit" list="units" value="${esc(it.unit)}"><datalist id="units">${unitOptions()}</datalist></label>
       <label class="field"><span>Категория</span><select id="f_cat">${S.cats.map(c => `<option value="${c.id}" ${c.id === it.cat ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
-      <label class="field"><span>Мин. остаток на будни</span><input id="f_pw" inputmode="decimal" value="${it.pw ? fmt(it.pw) : ''}"></label>
-      <label class="field"><span>Мин. остаток на выходные</span><input id="f_pe" inputmode="decimal" value="${it.pe ? fmt(it.pe) : ''}"></label>
     </div>
+    <label class="field" id="f_pwbox" style="${isList(it) ? 'display:none' : ''}"><span>Минимальный остаток</span><input id="f_pw" inputmode="decimal" value="${it.pw ? fmt(it.pw) : ''}"></label>
     <label class="check big"><input type="checkbox" id="f_kind" ${isList(it) ? 'checked' : ''}> Ассортимент: вкусы вписываются вручную</label>
     <label class="field" id="f_knownbox" style="${isList(it) ? '' : 'display:none'}"><span>Вкусы для быстрого выбора (каждый с новой строки)</span><textarea id="f_known">${esc((it.known || []).join('\n'))}</textarea></label>
     <label class="field"><span>Заказ по (объём бутылки / упаковки)</span><input id="f_step" inputmode="decimal" value="${it.step ? fmt(it.step) : ''}" placeholder="${it.unit === 'шт' ? '1' : '0,1'}"></label>
@@ -409,12 +418,12 @@ function openItem(id) {
     ${id ? `<div class="btnrow"><button class="btn small" data-move="-1">Выше</button><button class="btn small" data-move="1">Ниже</button><button class="btn small danger" id="f_del">Удалить</button></div>` : ''}`;
   const dlg = document.getElementById('dlg'); dlg.showModal();
   b.querySelector('#f_cancel').onclick = () => dlg.close();
-  b.querySelector('#f_kind').onchange = e => { b.querySelector('#f_knownbox').style.display = e.target.checked ? '' : 'none'; };
+  b.querySelector('#f_kind').onchange = e => { b.querySelector('#f_knownbox').style.display = e.target.checked ? '' : 'none'; b.querySelector('#f_pwbox').style.display = e.target.checked ? 'none' : ''; };
   b.querySelector('#f_save').onclick = () => {
     const name = b.querySelector('#f_name').value.trim();
     if (!name) { b.querySelector('#f_name').focus(); return toast('Введите название'); }
     const data = { name, unit: b.querySelector('#f_unit').value.trim() || 'шт', cat: b.querySelector('#f_cat').value,
-      pw: num(b.querySelector('#f_pw').value) || 0, pe: num(b.querySelector('#f_pe').value) || 0, step: num(b.querySelector('#f_step').value) || 0,
+      pw: num(b.querySelector('#f_pw').value) || 0, pe: 0, step: num(b.querySelector('#f_step').value) || 0,
       kind: b.querySelector('#f_kind').checked ? 'list' : undefined,
       known: [...new Set(b.querySelector('#f_known').value.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean))] };
     if (id) {
@@ -475,19 +484,20 @@ function openCat(id) {
 /* ---------- ЕЩЁ: подсказки, история, копия ---------- */
 function suggestions() {
   const out = [];
-  ['w', 'e'].forEach(m => {
-    const h = S.history.filter(x => x.mode === m).slice(-3);
+  [0].forEach(() => {
+    const h = S.history.slice(-3);
     if (h.length < 3) return;
     S.items.forEach(it => {
-      const p = plan(it, m); if (!(p > 0)) return;
+      if (isList(it)) return;
+      const p = plan(it); if (!(p > 0)) return;
       const v = h.map(x => x.stocks[it.id]); if (v.some(x => x == null)) return;
       let dir = null, np = p;
       if (v.every(x => x <= 0.15 * p)) { dir = 'up'; np = roundUp(p * 1.25, stepOf(it)); }
       else if (v.every(x => x > p)) { dir = 'down'; np = Math.max(stepOf(it), roundUp(p * 0.8, stepOf(it))); }
       if (!dir || np === p) return;
-      const key = `${it.id}|${m}|${dir}|${h[2].t}`;
+      const key = `${it.id}|${dir}|${h[2].t}`;
       if (S.dismissed[key]) return;
-      out.push({ it, m, dir, p, np, key });
+      out.push({ it, dir, p, np, key });
     });
   });
   return out;
@@ -498,12 +508,12 @@ function renderMore() {
   const hist = S.history.slice().reverse();
   document.getElementById('main').innerHTML = `
     <div class="panel"><h2>Подсказки по мин. остаткам</h2>
-      ${sg.length ? sg.map(s => `<div class="sug"><div class="t"><b>${esc(s.it.name)}</b>, ${modeWord(s.m)}: ${s.dir === 'up' ? 'последние 3 раза почти заканчивалось' : 'последние 3 раза оставалось выше минимума'}. Мин. остаток ${fmt(s.p)} → <b>${fmt(s.np)} ${esc(s.it.unit)}</b></div>
+      ${sg.length ? sg.map(s => `<div class="sug"><div class="t"><b>${esc(s.it.name)}</b>: ${s.dir === 'up' ? 'последние 3 раза почти заканчивалось' : 'последние 3 раза оставалось выше минимума'}. Мин. остаток ${fmt(s.p)} → <b>${fmt(s.np)} ${esc(s.it.unit)}</b></div>
         <div><button class="btn small primary" data-acc="${s.key}">Принять</button> <button class="btn small" data-dis="${s.key}">Оставить</button></div></div>`).join('')
-      : `<p>Подсказки появятся после трёх сохранённых заявок на будни или на выходные. Приложение сравнит остатки с минимальными и предложит поднять или снизить их.</p>`}
+      : `<p>Подсказки появятся после трёх сохранённых заявок. Приложение сравнит остатки с минимальными и предложит поднять или снизить их.</p>`}
     </div>
     <div class="panel"><h2>История заявок</h2>
-      ${hist.length ? hist.map(h => `<details class="hist"><summary>${dstr(h.t)}, ${modeWord(h.mode)}${h.coef !== 1 ? `, ×${fmt(h.coef)}` : ''}</summary><pre>${esc(h.text || 'Пустая заявка')}</pre><button class="btn small" data-copyh="${h.t}">Скопировать</button> <button class="btn small danger" data-delh="${h.t}">Удалить</button></details>`).join('')
+      ${hist.length ? hist.map(h => `<details class="hist"><summary>${dstr(h.t)}${h.coef !== 1 ? `, ×${fmt(h.coef)}` : ''}</summary><pre>${esc(h.text || 'Пустая заявка')}</pre><button class="btn small" data-copyh="${h.t}">Скопировать</button> <button class="btn small danger" data-delh="${h.t}">Удалить</button></details>`).join('')
       : `<p>Здесь будут заявки, сохранённые кнопкой «Сохранить в историю».</p>`}
     </div>
     <div class="panel"><h2>Передать барменам</h2>
@@ -528,8 +538,6 @@ function badge() {
 /* ---------- общий рендер ---------- */
 const titles = { count: 'Пересчёт', order: 'Заявка', items: 'Позиции', more: 'Ещё' };
 function render() {
-  document.body.dataset.mode = S.mode;
-  document.querySelectorAll('.mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode));
   document.querySelectorAll('nav.tabs button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   document.getElementById('ttl').textContent = titles[tab];
   ({ count: renderCount, order: renderOrder, items: renderItems, more: renderMore })[tab]();
@@ -537,10 +545,6 @@ function render() {
 }
 function go(t) { tab = t; window.scrollTo(0, 0); render(); }
 
-document.querySelector('.mode').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  S.mode = b.dataset.m; S.coef = 1; save(); render();
-});
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.tab); });
 
 document.addEventListener('input', e => {
@@ -600,7 +604,7 @@ document.addEventListener('click', e => {
   else if (t.dataset.editcat) openCat(t.dataset.editcat);
   else if (t.dataset.acc) {
     const s = suggestions().find(x => x.key === t.dataset.acc);
-    if (s) { s.it[s.m === 'w' ? 'pw' : 'pe'] = s.np; S.dismissed[s.key] = 1; save(); render(); toast('Мин. остаток обновлён'); }
+    if (s) { s.it.pw = s.np; S.dismissed[s.key] = 1; save(); render(); toast('Мин. остаток обновлён'); }
   }
   else if (t.dataset.dis) { S.dismissed[t.dataset.dis] = 1; save(); render(); }
   else if (t.dataset.copyh) { const h = S.history.find(x => x.t == t.dataset.copyh); if (h) copyText(h.text); }
@@ -612,7 +616,7 @@ document.addEventListener('click', e => {
     case 'copy': copyText(orderText()); break;
     case 'saveHist': {
       const stocks = {}; S.items.forEach(i => { if (S.stocks[i.id] != null) stocks[i.id] = S.stocks[i.id]; });
-      S.history.push({ t: Date.now(), mode: S.mode, coef: S.coef, stocks, text: orderText() });
+      S.history.push({ t: Date.now(), coef: S.coef, stocks, text: orderText() });
       S.history = S.history.slice(-60); save(); badge(); toast('Сохранено в историю');
       break;
     }
@@ -647,7 +651,7 @@ document.addEventListener('click', e => {
       const dlg = document.getElementById('dlg'); dlg.showModal();
       b.querySelector('#bkNo').onclick = () => dlg.close();
       b.querySelector('#bkGo').onclick = () => {
-        try { const d = JSON.parse(b.querySelector('#bk').value); if (!Array.isArray(d.items) || !Array.isArray(d.cats)) throw 0; S = d; S.lists ||= {}; S.mig1 ||= 1; S.stocks ||= {}; S.history ||= []; S.dismissed ||= {}; S.coef ||= 1; if (S.withCats === undefined) S.withCats = true; save(); dlg.close(); render(); toast('Данные восстановлены'); }
+        try { const d = JSON.parse(b.querySelector('#bk').value); if (!Array.isArray(d.items) || !Array.isArray(d.cats)) throw 0; S = d; S.lists ||= {}; S.mig1 ||= 1; S.mig2 ||= 1; S.stocks ||= {}; S.history ||= []; S.dismissed ||= {}; S.coef ||= 1; if (S.withCats === undefined) S.withCats = true; save(); dlg.close(); render(); toast('Данные восстановлены'); }
         catch (err) { toast('Это не похоже на резервную копию'); }
       };
       break;
